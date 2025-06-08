@@ -1,0 +1,132 @@
+# -----------------------------------------------------------------------
+# Top‐level flags: decide which sub‐models to include in the ensemble
+use_spsl:    true       # include the SPSL branch
+use_ucf:     true       # include the UCF branch
+use_stil:    true       # include the STIL branch
+use_uia_vit: true       # include the UIA‐ViT branch
+use_image_branch: True # if true, enables the raw‐image feature branch
+fusion_level: "decision" # either "feature" or "decision"
+
+# -----------------------------------------------------------------------
+# Filepaths to each pretrained checkpoint. 
+# The code will do:  ck = torch.load(path),  
+#                 state = ck.get("model_state", ck),  
+#                 model.load_state_dict(state)
+#
+# Make sure these point to actual .pth or .pt files on disk.
+spsl_weights:    "/workspace/weights/spsl_best.pth"
+ucf_weights:     "/workspace/weights/ucf_best.pth"
+stil_weights:    "/workspace/weights/stil_best.pth"
+uia_vit_weights: "/workspace/weights/uia_vit_best.pth"
+
+# -----------------------------------------------------------------------
+# Sub‐module‐specific configurations.  These dicts will be passed to the
+# constructor of each detector (e.g. SpslDetector(config["spsl_config"]))
+#
+# You must supply at least the `feat_dim` (output dimension of the
+# "feat" tensor after global pooling) for each branch so that the ensemble
+# can correctly build its AttentionFusion.
+
+spsl_config:
+  # "feat_dim" must exactly match whatever SPSLDetector emits as the dimension
+  # of its final feature vector (after adaptive‐pooling).  
+  feat_dim: 2048       
+  yaml_path: "/workspace/src/training/config/detector/spsl.yaml"
+
+ucf_config:
+  # UCFDetector’s “half_fingerprint_dim” must be included here.  
+  # In the UCF code, this is typically the dimension of the shared feature
+  # after the “block_sha” step (often 512 or 1024).  
+  half_fingerprint_dim: 512
+  yaml_path: "/workspace/src/training/config/detector/ucf.yaml"
+
+stil_config:
+  # STILDetector’s final “feat_dim” (e.g. 2048) must be set here.
+  feat_dim: 2048   
+  yaml_path: "/workspace/src/training/config/detector/stil.yaml"
+  num_class: 2
+
+uia_vit_config:
+  # UIAViTDetector’s final “feat_dim” (e.g. 768 or 1024) must be set here.
+  feat_dim: 768   
+  yaml_path: "/workspace/src/training/config/detector/uia_vit.yaml"
+
+# -----------------------------------------------------------------------
+# If use_image_branch: the ensemble will add one more 64‐dim vector per image.
+# “image_branch_dim” must match the last linear layer’s output.  
+image_branch_dim: 64  
+
+# -----------------------------------------------------------------------
+# After collecting dims of all active branches, the AttentionFusion projects
+# them to `fused_dim` before building the weighted sum.  
+fused_dim: 512
+
+# -----------------------------------------------------------------------
+# Final “judge” classifier head on top of the fused features:
+judge_hidden: 256    # size of hidden FC layer
+num_classes: 2       # for binary Real vs. Fake
+
+# -----------------------------------------------------------------------
+# Loss‐weight hyperparameters (optional—can be hardcoded in the code as well)
+loss_weights:
+    lambda_balance: 0.1         # weight on feature‐balance (or reconstruction) if used
+    mu_alignment: 0.1         # weight on alignment loss
+
+# -----------------------------------------------------------------------
+# (Optional) training hyperparameters, epochs, lr, etc.
+training:
+  batch_size: 32
+  epochs: 50
+  learning_rate: 0.0001
+  num_workers: 8
+  weight_decay: 0.00001
+  optimizer: "Adam"
+  scheduler: "CosineAnnealing"
+  T_max: 500
+  eta_min: 0.000001
+  last_epoch: -1
+  patience: 3
+
+# -----------------------------------------------------------------------
+#dataset paths, logging, etc.  
+dataset:
+  sequence_length: 8
+  img_size: 224
+  video_size: 224
+  pick_frame: "middle"
+
+  train_metadata:
+    name: "FaceForensics++"
+    path: "/workspace/src/preprocessing/dataset_jsons/FaceForensics++.json"
+    class_keys: ["FF-real", "FF-NT", "FF-FS", "FF-F2F", "FF-DF"]
+
+  val_metadata:
+    name: "Celeb-DF-v1"
+    path: "/workspace/src/preprocessing/dataset_jsons/Celeb-DF-v1.json"
+    class_keys: ["CelebDFv1_real", "CelebDFv1_fake"]
+
+  test_metadata:
+    - name: "FaceForensics++"
+      path: "/workspace/src/preprocessing/dataset_jsons/FaceForensics++.json"
+      class_keys: ["FF-real", "FF-NT", "FF-FS", "FF-F2F", "FF-DF"]
+    - name: "Celeb-DF-v2"
+      path: "/workspace/src/preprocessing/dataset_jsons/Celeb-DF-v2.json"
+      class_keys: ["CelebDFv2_real", "CelebDFv2_fake"]
+    - name: "deepFakeDetection"
+      path: "/workspace/src/preprocessing/dataset_jsons/DeepFakeDetection.json"
+      class_keys: ["DFD_real", "DFD_fake"]
+    - name: "Celeb-DF-v1"
+      path: "/workspace/src/preprocessing/dataset_jsons/Celeb-DF-v1.json"
+      class_keys: ["CelebDFv1_real", "CelebDFv1_fake"]
+
+testing:
+  batch_size: 32
+  num_workers: 8
+
+ensemble_weights: "/workspace/src/training/best_epoch_007_val_loss_0.4162.pth"
+
+
+logging:
+  log_dir: "/workspace/logs/ensemble_model"
+  log_level: "INFO"
+  checkpoint_dir: "/workspace/checkpoints"

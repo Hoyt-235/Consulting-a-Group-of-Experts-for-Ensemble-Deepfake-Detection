@@ -1,0 +1,10 @@
+dlib==19.24.6
+numpy==2.2.5
+opencv_python_headless==4.11.0.86
+Pillow==11.2.1
+scikit_learn==1.6.1
+skimage==0.0
+torch==2.6.0
+torchinfo==1.8.0
+torchvision==0.21.0
+tqdm==4.67.1

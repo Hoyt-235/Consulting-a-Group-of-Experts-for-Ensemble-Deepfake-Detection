@@ -1,0 +1,17 @@
+*.mp4
+*.png
+*.jpg
+*.npy
+*.pth
+*.pt
+__pycache__
+venv
+venv2
+*.ipynb
+logs/
+logs
+.ipynb_checkpoints/
+secrets.toml
+.streamlit/
+*.json
+*.dat
